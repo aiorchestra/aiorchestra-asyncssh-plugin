@@ -1,0 +1,59 @@
+tosca_definitions_version: tosca_simple_yaml_1_0
+
+node_types:
+
+##################################################################################################
+# AsyncSSH base node types
+##################################################################################################
+
+  tosca.asyncssh.relationships.node:
+    derived_from: tosca.relationships.Root
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: aiorchestra.core.noop:link
+          inputs:
+            type: map
+        unlink:
+          implementation: aiorchestra.core.noop:unlink
+          inputs:
+            type: map
+
+##################################################################################################
+# AsyncSSH Software Configuration
+##################################################################################################
+
+  tosca.asyncssh.software_configuration:
+    derived_from: tosca.nodes.Root
+    properties:
+      username:
+        type: string
+        required: true
+      password:
+        type: string
+        default: ''
+        required: false
+      port:
+        type: int
+        required: false
+        default: 22
+      script:
+        type: string
+        required: true
+      environment:
+        type: map
+        required: false
+        defaulf: {}
+    requirements:
+      - compute:
+          node: tosca.nodes.Root
+          relationship: tosca.relationships.DependsOn
+          occurrences: [1, 1]
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: asyncssh_plugin.tasks:install
+        delete:
+          implementation: asyncssh_plugin.tasks:uninstall
