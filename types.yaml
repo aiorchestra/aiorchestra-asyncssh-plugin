@@ -54,6 +54,8 @@ node_types:
       Standard:
         type: tosca.interfaces.node.lifecycle.Standard
         create:
+          implementation: asyncssh_plugin.tasks:create
+        start:
           implementation: asyncssh_plugin.tasks:install
         delete:
           implementation: asyncssh_plugin.tasks:uninstall

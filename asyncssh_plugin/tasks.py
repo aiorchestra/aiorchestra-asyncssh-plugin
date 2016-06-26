@@ -41,6 +41,7 @@ class MySSHClientSession(asyncssh.SSHClientSession):
 async def run_script(script, env, username, password,
                      private_key, pub_key, host, port, event_loop):
     pkey = public_key.import_private_key(private_key)
+    known_host = asyncssh.import_known_hosts("{0} {1}".format(host, pub_key))
     pub_key = public_key.import_public_key(pub_key)
     conn, client = await asyncssh.create_connection(
         asyncssh.SSHClient, host,
@@ -49,7 +50,7 @@ async def run_script(script, env, username, password,
         password=password,
         port=port,
         loop=event_loop,
-        known_hosts=([pub_key], [], [])
+        known_hosts=None,
     )
     async with conn:
         command = ('echo -e "{0}" >> /tmp/aiochestra-install-script.sh; '
@@ -65,6 +66,11 @@ async def run_script(script, env, username, password,
 
 
 @utils.operation
+async def create(node, inputs):
+    pass
+
+
+@utils.operation
 async def install(node, inputs):
     event_loop = node.context.event_loop
     host = node.runtime_properties['access_ip']
@@ -77,7 +83,7 @@ async def install(node, inputs):
     pub_key = node.runtime_properties[
         'ssh_keypair']['public_key']
     script = node.properties['script']
-    env = node.properties.get('environment')
+    env = node.properties.get('environment', {})
     _script = None
     with open(script, 'rb') as s:
         _script = s.read()
