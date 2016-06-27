@@ -9,9 +9,8 @@ description: Router with Ext net and two internal networks
 
 imports:
 
-  - aiorchestra-openstack-plugin/types.yaml
   - ../types.yaml
-#  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/0.1.1-stable/types.yaml
+  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/master/types.yaml
 
 
 topology_template:
@@ -94,6 +93,9 @@ topology_template:
 
     ssh_port:
       type: int
+
+    install_script:
+      type: string
 
 #####################################################################
 # Node templates
@@ -204,12 +206,14 @@ topology_template:
             node: orchestra_subnet_port_one
             relationship: tosca.openstack.compute.connect_port_to_compute
 
-    orchestra_software_configuration:
-      type: tosca.asyncssh.software_configuration
+    orchestra_software_configuration_script:
+      type: tosca.asyncssh.software_configuration.script
       properties:
         username: { get_input: username }
         port: { get_input: ssh_port }
-        script: '/Users/denismakogon/Documents/Invader/aiorchestra-asyncssh-plugin/examples/scripts/install.sh'
+        install_script: { get_input: install_script }
+        environment:
+          my_own_var: 'Adele: Hello from the other side!'
       requirements:
         - compute: orchestra_compute
         - ip:

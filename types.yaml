@@ -24,7 +24,7 @@ node_types:
 # AsyncSSH Software Configuration
 ##################################################################################################
 
-  tosca.asyncssh.software_configuration:
+  tosca.asyncssh.software_configuration.script:
     derived_from: tosca.nodes.Root
     properties:
       username:
@@ -38,18 +38,22 @@ node_types:
         type: int
         required: false
         default: 22
-      script:
+      install_script:
         type: string
         required: true
+      uninstall_script:
+        type: string
+        required: false
+        default: ''
       environment:
         type: map
         required: false
-        defaulf: {}
+        default: {}
     requirements:
       - compute:
           node: tosca.nodes.Root
           relationship: tosca.relationships.DependsOn
-          occurrences: [1, 1]
+          occurrences: [0, 1]
     interfaces:
       Standard:
         type: tosca.interfaces.node.lifecycle.Standard
@@ -57,5 +61,13 @@ node_types:
           implementation: asyncssh_plugin.tasks:create
         start:
           implementation: asyncssh_plugin.tasks:install
-        delete:
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+        stop:
           implementation: asyncssh_plugin.tasks:uninstall
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+        stop:
+          implementation: asyncssh_plugin.tasks:delete
