@@ -34,10 +34,12 @@ async def run_command(node, conn, command):
     node.context.logger.debug('[{0}] - Running command "{1}".'
                               .format(node.name, command))
     stdin, stdout, stderr = await conn.open_session(command)
-    output = await stdout.read()
-    if output:
-        node.context.logger.info('[{0}] - Script execution output:\n{1}'
-                                 .format(node.name, output))
+    eof = False
+    while not eof:
+        line = await stdout.readline()
+        if line:
+            node.context.logger.info('{1}'.format(node.name, line))
+        eof = stdout.at_eof()
     errs = await stderr.read()
     if errs:
         node.context.logger.error('[{0}] - Script execution errors:\n{1}'
@@ -55,8 +57,8 @@ async def run_command(node, conn, command):
 
 
 async def setup_connection(event_loop,
-                           task_retry_interval=10,
-                           task_retries=10,
+                           task_retry_interval=None,
+                           task_retries=None,
                            username=None, password=None,
                            private_key=None, host=None,
                            port=None):
@@ -75,7 +77,7 @@ async def setup_connection(event_loop,
         asyncssh.create_connection,
         args=args,
         kwargs=kwargs,
-        exceptions=(Exception, ),
+        exceptions=(ConnectionRefusedError,),
         task_retry_interval=task_retry_interval,
         task_retries=task_retries
     )
@@ -83,8 +85,8 @@ async def setup_connection(event_loop,
 
 
 async def run_script(node, script, event_loop,
-                     task_retry_interval=10,
-                     task_retries=10,
+                     task_retry_interval=None,
+                     task_retries=None,
                      env=None, username=None,
                      password=None, private_key=None,
                      host=None, port=None):
@@ -98,6 +100,7 @@ async def run_script(node, script, event_loop,
         node.context.logger.info('[{0}] - SSH connection established, '
                                  'attempting to run software '
                                  'configuration.'.format(node.name))
+        env.update(node.runtime_properties['ssh'])
         session_env = prepare_env(env)
         setup_commands = [
           "echo -e '{0}' >> /tmp/aiochestra.rc".format(session_env),
@@ -137,8 +140,8 @@ async def create(node, inputs):
 
 
 async def run(script_type, node, event_loop,
-              task_retry_interval=10,
-              task_retries=10):
+              task_retry_interval=None,
+              task_retries=None):
 
     try:
         with open(node.properties[script_type], 'r') as s:
@@ -152,13 +155,13 @@ async def run(script_type, node, event_loop,
         node.context.logger.info('[{0}] - Exception during software '
                                  'configuration, reason: {1}.'
                                  .format(node.name, str(ex)))
-        return False
+        raise ex
 
 
 @utils.operation
 async def install(node, inputs):
-    task_retry_interval = inputs.get('task_retry_interval', 10)
-    task_retries = inputs.get('task_retries', 10)
+    task_retry_interval = inputs.get('task_retry_interval')
+    task_retries = inputs.get('task_retries')
     node.context.logger.info('[{0}] - Starting software configuration.'
                              .format(node.name))
     event_loop = node.context.event_loop
@@ -169,13 +172,15 @@ async def install(node, inputs):
 
 @utils.operation
 async def uninstall(node, inputs):
+    node.context.logger.info('[{0}] - Starting graceful uninstall. '
+                             .format(node.name))
     if not node.properties['uninstall_script']:
         node.context.logger.info('[{0}] - Skipping graceful uninstall. '
                                  'Uninstall script was not specified'
                                  .format(node.name))
     else:
-        task_retries = inputs.get('task_retries', 10)
-        task_retry_interval = inputs.get('task_retry_interval', 10)
+        task_retries = inputs.get('task_retries')
+        task_retry_interval = inputs.get('task_retry_interval')
         event_loop = node.context.event_loop
         try:
             await run('uninstall_script', node, event_loop,

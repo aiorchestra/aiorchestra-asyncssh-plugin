@@ -222,3 +222,19 @@ topology_template:
         - ssh:
             node: orchestra_keypair
             relationship: tosca.openstack.access_and_security.ssh_keypair_provider
+      interfaces:
+        Standard:
+          create:
+            implementation: asyncssh_plugin.tasks:create
+          start:
+            implementation: asyncssh_plugin.tasks:install
+            inputs:
+              task_retries: 7
+              task_retry_interval: 10
+          stop:
+            implementation: asyncssh_plugin.tasks:uninstall
+            inputs:
+              task_retries: 7
+              task_retry_interval: 10
+          stop:
+            implementation: asyncssh_plugin.tasks:delete
