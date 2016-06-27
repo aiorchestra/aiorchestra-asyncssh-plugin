@@ -1,5 +1,11 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
+set -e
 
 echo -e "INSTALL"
 
-uname
+uname -a
+
+echo -e $my_own_var
+
+whoami

@@ -13,38 +13,57 @@
 #    under the License.
 
 import asyncssh
-import sys
 
 from asyncssh import public_key
 
 from aiorchestra.core import utils
 
 
-class MySSHClientSession(asyncssh.SSHClientSession):
-    def data_received(self, data, datatype):
-        if datatype == asyncssh.EXTENDED_DATA_STDERR:
-            print(data, end='', file=sys.stderr)
-        else:
-            print(data, end='')
-
-    def exit_status_received(self, status):
-        if status:
-            print('Program exited with status %d' % status, file=sys.stderr)
-        else:
-            print('Program exited successfully')
-
-    def connection_lost(self, exc):
-        if exc:
-            print('SSH session error: ' + str(exc), file=sys.stderr)
+def prepare_env(env):
+    bin_bash = '#!/bin/bash\n{0}'
+    pattern = 'export {0}="{1}"'
+    session_env = ''
+    exports = []
+    for k, v in env.items():
+        exports.append(session_env.join(
+            [pattern.format(k, v), ]))
+    return bin_bash.format('\n'.join(exports))
 
 
-async def run_script(script, env, username, password,
-                     private_key, pub_key, host, port, event_loop):
+async def run_command(node, conn, command):
+    node.context.logger.debug('[{0}] - Running command "{1}".'
+                              .format(node.name, command))
+    stdin, stdout, stderr = await conn.open_session(command)
+    output = await stdout.read()
+    if output:
+        node.context.logger.info('[{0}] - Script execution output:\n{1}'
+                                 .format(node.name, output))
+    errs = await stderr.read()
+    if errs:
+        node.context.logger.error('[{0}] - Script execution errors:\n{1}'
+                                  .format(node.name, errs))
+
+    await stdout.channel.wait_closed()
+    exit_status = stdout.channel.get_exit_status()
+    node.context.logger.debug('[{0}] - Script exit code: {1}.'
+                              .format(node.name, exit_status))
+    if exit_status:
+        raise Exception('[{0}] - Unable to finish software '
+                        'configuration successfully, '
+                        'aborting. Reason: {1}.'
+                        .format(node.name, errs))
+
+
+async def setup_connection(event_loop,
+                           task_retry_interval=10,
+                           task_retries=10,
+                           username=None, password=None,
+                           private_key=None, host=None,
+                           port=None):
     pkey = public_key.import_private_key(private_key)
-    known_host = asyncssh.import_known_hosts("{0} {1}".format(host, pub_key))
-    pub_key = public_key.import_public_key(pub_key)
-    conn, client = await asyncssh.create_connection(
-        asyncssh.SSHClient, host,
+    args = (asyncssh.SSHClient, host)
+    kwargs = {}
+    kwargs.update(
         username=username,
         client_keys=[pkey, ],
         password=password,
@@ -52,56 +71,128 @@ async def run_script(script, env, username, password,
         loop=event_loop,
         known_hosts=None,
     )
-    async with conn:
-        command = ('echo -e "{0}" >> /tmp/aiochestra-install-script.sh; '
-                   'chmod +x /tmp/aiochestra-install-script.sh; '
-                   './tmp/aiochestra-install-script.sh;'.format(script))
+    conn, client = await utils.retry(
+        asyncssh.create_connection,
+        args=args,
+        kwargs=kwargs,
+        exceptions=(Exception, ),
+        task_retry_interval=task_retry_interval,
+        task_retries=task_retries
+    )
+    return conn, client
 
-        channel, session = await conn.create_session(
-            asyncssh.SSHClientSession,
-            command=command,
-            env=env
-        )
-        await channel.wait_closed()
+
+async def run_script(node, script, event_loop,
+                     task_retry_interval=10,
+                     task_retries=10,
+                     env=None, username=None,
+                     password=None, private_key=None,
+                     host=None, port=None):
+    conn, client = await setup_connection(
+        event_loop,
+        task_retry_interval=task_retry_interval,
+        task_retries=task_retries,
+        username=username, password=password,
+        private_key=private_key, host=host, port=port)
+    async with conn:
+        node.context.logger.info('[{0}] - SSH connection established, '
+                                 'attempting to run software '
+                                 'configuration.'.format(node.name))
+        session_env = prepare_env(env)
+        setup_commands = [
+          "echo -e '{0}' >> /tmp/aiochestra.rc".format(session_env),
+          "echo -e '{0}' >> /tmp/aiochestra-install-script.sh".format(script),
+          "chmod +x /tmp/aiochestra-install-script.sh",
+          "chmod +x /tmp/aiochestra.rc",
+        ]
+
+        install_command = ("source /tmp/aiochestra.rc && "
+                           "/bin/bash /tmp/aiochestra-install-script.sh;")
+
+        node.context.logger.debug('[{0}] - Running preparations for '
+                                  'software configuration script.')
+        for command in setup_commands:
+            await run_command(node, conn, command)
+
+        node.context.logger.info('[{0}] - Running software '
+                                 'configuration script.'
+                                 .format(node.name))
+        await run_command(node, conn, install_command)
 
 
 @utils.operation
 async def create(node, inputs):
-    pass
+    node.context.logger.info('[{0}] - Setting up SSH '
+                             'connection environment.'
+                             .format(node.name))
+    node.update_runtime_properties('ssh', {
+        'host': node.runtime_properties['access_ip'],
+        'port': node.properties['port'],
+        'username': node.properties['username'],
+        'password': node.properties.get('password'),
+        'private_key': node.runtime_properties[
+            'ssh_keypair']['private_key_content'],
+        'env': node.properties.get('environment', {})
+    })
+
+
+async def run(script_type, node, event_loop,
+              task_retry_interval=10,
+              task_retries=10):
+
+    try:
+        with open(node.properties[script_type], 'r') as s:
+            script = s.read()
+        await run_script(node, str(script),
+                         event_loop,
+                         task_retries=task_retries,
+                         task_retry_interval=task_retry_interval,
+                         **node.runtime_properties['ssh'])
+    except Exception as ex:
+        node.context.logger.info('[{0}] - Exception during software '
+                                 'configuration, reason: {1}.'
+                                 .format(node.name, str(ex)))
+        return False
 
 
 @utils.operation
 async def install(node, inputs):
+    task_retry_interval = inputs.get('task_retry_interval', 10)
+    task_retries = inputs.get('task_retries', 10)
+    node.context.logger.info('[{0}] - Starting software configuration.'
+                             .format(node.name))
     event_loop = node.context.event_loop
-    host = node.runtime_properties['access_ip']
-    port = node.properties['port']
-
-    username = node.properties['username']
-    password = node.properties.get('password')
-    key = node.runtime_properties[
-        'ssh_keypair']['private_key_content']
-    pub_key = node.runtime_properties[
-        'ssh_keypair']['public_key']
-    script = node.properties['script']
-    env = node.properties.get('environment', {})
-    _script = None
-    with open(script, 'rb') as s:
-        _script = s.read()
-
-    async def try_to_connect():
-        try:
-            await run_script(_script, env, username,
-                             password, key, pub_key, host,
-                             port, event_loop)
-            return True
-        except Exception as ex:
-            node.context.logger.info(str(ex))
-            return False
-
-    await utils.retry(try_to_connect, exceptions=(Exception, ),
-                      task_retries=20, task_retry_interval=5)
+    await run('install_script', node, event_loop,
+              task_retry_interval=task_retry_interval,
+              task_retries=task_retries)
 
 
 @utils.operation
 async def uninstall(node, inputs):
-    pass
+    if not node.properties['uninstall_script']:
+        node.context.logger.info('[{0}] - Skipping graceful uninstall. '
+                                 'Uninstall script was not specified'
+                                 .format(node.name))
+    else:
+        task_retries = inputs.get('task_retries', 10)
+        task_retry_interval = inputs.get('task_retry_interval', 10)
+        event_loop = node.context.event_loop
+        try:
+            await run('uninstall_script', node, event_loop,
+                      task_retry_interval=task_retry_interval,
+                      task_retries=task_retries)
+        except Exception as ex:
+            node.context.logger.info('[{0}] - Graceful uninstall failed. '
+                                     'Reason: {1}. '
+                                     'Proceeding to next task.'
+                                     .format(node.name, str(ex)))
+            pass
+
+
+@utils.operation
+async def delete(node, inputs):
+    node.context.logger.info('[{0}] - Destroying SSH '
+                             'connection environment.'
+                             .format(node.name))
+    if 'ssh' in node.runtime_properties:
+        del node.runtime_properties['ssh']

@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
+set -e
 
 echo -e "INSTALL"
 
-uname
+uname -a
