@@ -1,0 +1,96 @@
+tosca_definitions_version: tosca_simple_yaml_1_0
+
+description: TEST
+
+
+#####################################################################
+# Imports
+#####################################################################
+
+imports:
+
+  - ../../../types.yaml
+
+
+node_types:
+
+  tosca.aiorchestra.node:
+    derived_from: tosca.nodes.Root
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: aiorchestra.core.noop:noop
+        start:
+          implementation: aiorchestra.core.noop:noop
+        stop:
+          implementation: aiorchestra.core.noop:noop
+        delete:
+          implementation: aiorchestra.core.noop:noop
+        configure:
+          implementation: aiorchestra.core.noop:noop
+
+  test.asyncssh.plugin.inject_host_key:
+    derived_from: tosca.relationships.Root
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: asyncssh_plugin.tests.plugin:inject_host_and_key
+        unlink:
+          implementation: asyncssh_plugin.tests.plugin:eject_host_and_key
+
+
+topology_template:
+#####################################################################
+# Inputs
+#####################################################################
+
+  inputs:
+
+    username:
+      type: string
+
+    ssh_port:
+      type: int
+
+    install_script:
+      type: string
+
+#####################################################################
+# Node templates
+#####################################################################
+
+  node_templates:
+
+    relationship_stab:
+      type: tosca.aiorchestra.node
+
+    orchestra_software_configuration_script:
+      type: tosca.asyncssh.software_configuration.script
+      properties:
+        username: { get_input: username }
+        port: { get_input: ssh_port }
+        install_script: { get_input: install_script }
+        environment:
+          my_own_var: 'Adele: Hello from the other side!'
+      requirements:
+        - host_and_key:
+            node: relationship_stab
+            relationship: test.asyncssh.plugin.inject_host_key
+      interfaces:
+        Standard:
+          create:
+            implementation: asyncssh_plugin.tasks:create
+          start:
+            implementation: asyncssh_plugin.tasks:install
+            inputs:
+              task_retries: 2
+              task_retry_interval: 5
+          stop:
+            implementation: asyncssh_plugin.tasks:uninstall
+            inputs:
+              task_retries: 2
+              task_retry_interval: 5
+          stop:
+            implementation: asyncssh_plugin.tasks:delete

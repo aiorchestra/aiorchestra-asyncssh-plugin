@@ -69,5 +69,5 @@ node_types:
           inputs:
             task_retries: 10
             task_retry_interval: 10
-        stop:
+        delete:
           implementation: asyncssh_plugin.tasks:delete

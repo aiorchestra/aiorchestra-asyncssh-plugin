@@ -2,7 +2,7 @@
 
 set -e
 
-echo -e "UNINSTALL"
+echo -e "INSTALL"
 
 uname -a
 

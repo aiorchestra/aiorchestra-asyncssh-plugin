@@ -39,8 +39,6 @@ setuptools.setup(
         'Intended Audience :: System Administrators',
         'Intended Audience :: Developers',
         'Environment :: No Input/Output (Daemon)',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Topic :: Software Development :: '
         'Libraries :: Python Modules',
