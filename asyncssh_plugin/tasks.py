@@ -41,15 +41,13 @@ async def run_command(node, conn, command):
             node.context.logger.info('{1}'.format(node.name, line))
         eof = stdout.at_eof()
     errs = await stderr.read()
-    if errs:
-        node.context.logger.error('[{0}] - Script execution errors:\n{1}'
-                                  .format(node.name, errs))
-
     await stdout.channel.wait_closed()
     exit_status = stdout.channel.get_exit_status()
     node.context.logger.debug('[{0}] - Script exit code: {1}.'
                               .format(node.name, exit_status))
     if exit_status:
+        node.context.logger.error('[{0}] - Script execution errors:\n{1}'
+                                  .format(node.name, errs))
         raise Exception('[{0}] - Unable to finish software '
                         'configuration successfully, '
                         'aborting. Reason: {1}.'
@@ -100,17 +98,17 @@ async def run_script(node, script, event_loop,
         node.context.logger.info('[{0}] - SSH connection established, '
                                  'attempting to run software '
                                  'configuration.'.format(node.name))
-        env.update(node.runtime_properties['ssh'])
         session_env = prepare_env(env)
         setup_commands = [
-          "echo -e '{0}' >> /tmp/aiochestra.rc".format(session_env),
-          "echo -e '{0}' >> /tmp/aiochestra-install-script.sh".format(script),
-          "chmod +x /tmp/aiochestra-install-script.sh",
-          "chmod +x /tmp/aiochestra.rc",
+          "rm -fr /tmp/aiorchestra*",
+          'echo -e \'{0}\' >> /tmp/aiorchestra.rc'.format(session_env),
+          'echo -e \'{0}\' >> /tmp/aiorchestra-script.sh'.format(script),
+          'chmod +x /tmp/aiorchestra-script.sh',
+          'chmod +x /tmp/aiorchestra.rc',
         ]
 
-        install_command = ("source /tmp/aiochestra.rc && "
-                           "/bin/bash /tmp/aiochestra-install-script.sh;")
+        install_command = ("source /tmp/aiorchestra.rc && "
+                           "/bin/bash /tmp/aiorchestra-script.sh;")
 
         node.context.logger.debug('[{0}] - Running preparations for '
                                   'software configuration script.')
@@ -176,7 +174,7 @@ async def uninstall(node, inputs):
                              .format(node.name))
     if not node.properties['uninstall_script']:
         node.context.logger.info('[{0}] - Skipping graceful uninstall. '
-                                 'Uninstall script was not specified'
+                                 'Uninstall script was not specified.'
                                  .format(node.name))
     else:
         task_retries = inputs.get('task_retries')

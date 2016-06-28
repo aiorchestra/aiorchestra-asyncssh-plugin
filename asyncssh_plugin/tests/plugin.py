@@ -23,7 +23,7 @@ async def inject_host_and_key(source, target, input):
     with open(key, 'rb') as k:
         key_content = k.read()
         source.batch_update_runtime_properties(**{
-            'access_ip': 'localhost',
+            'access_ip': config.CONFIG.get('host'),
             'ssh_keypair': {
                 'private_key_content': key_content
             }

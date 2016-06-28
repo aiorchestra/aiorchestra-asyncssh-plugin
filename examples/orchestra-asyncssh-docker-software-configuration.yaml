@@ -206,7 +206,7 @@ topology_template:
             node: orchestra_subnet_port_one
             relationship: tosca.openstack.compute.connect_port_to_compute
 
-    orchestra_software_configuration_script:
+    orchestra_software_configuration.docker:
       type: tosca.asyncssh.software_configuration.script
       properties:
         username: { get_input: username }
@@ -236,5 +236,9 @@ topology_template:
             inputs:
               task_retries: 7
               task_retry_interval: 10
-          stop:
+          delete:
             implementation: asyncssh_plugin.tasks:delete
+
+  outputs:
+    ssh_priv:
+      value: { get_attribute: [orchestra_keypair, private_key_content] }

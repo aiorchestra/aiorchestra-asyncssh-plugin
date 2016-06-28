@@ -57,6 +57,9 @@ topology_template:
     install_script:
       type: string
 
+    uninstall_script:
+      type: string
+
 #####################################################################
 # Node templates
 #####################################################################
@@ -72,6 +75,7 @@ topology_template:
         username: { get_input: username }
         port: { get_input: ssh_port }
         install_script: { get_input: install_script }
+        uninstall_script: { get_input: uninstall_script }
         environment:
           my_own_var: 'Adele: Hello from the other side!'
       requirements:
@@ -92,5 +96,5 @@ topology_template:
             inputs:
               task_retries: 2
               task_retry_interval: 5
-          stop:
+          delete:
             implementation: asyncssh_plugin.tasks:delete
