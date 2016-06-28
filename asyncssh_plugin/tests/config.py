@@ -26,5 +26,5 @@ CONFIG = {
     'uninstall_script': os.path.join(tosca_directory, 'uninstall.sh'),
     'ssh_keypair': os.environ.get('SSH_KEYPAIR',
                                   os.path.expanduser('~/.ssh/id_rsa')),
-    'host': os.environ.get('SSH_HOST')
+    'host': os.environ.get('SSH_HOST', 'localhost'),
 }
