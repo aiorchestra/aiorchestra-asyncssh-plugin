@@ -3,20 +3,20 @@ tosca_definitions_version: tosca_simple_yaml_1_0
 node_types:
 
 ##################################################################################################
-# AsyncSSH base node types
+# AsyncSSH relationship type
 ##################################################################################################
 
-  tosca.asyncssh.relationships.node:
+  tosca.asyncssh.software_configuration.inject_environment:
     derived_from: tosca.relationships.Root
     interfaces:
       Configure:
         type: tosca.interfaces.relationship.Configure
         link:
-          implementation: aiorchestra.core.noop:link
+          implementation: asyncssh_plugin.tasks:inject
           inputs:
             type: map
         unlink:
-          implementation: aiorchestra.core.noop:unlink
+          implementation: asyncssh_plugin.tasks:eject
           inputs:
             type: map
 
@@ -45,14 +45,14 @@ node_types:
         type: string
         required: false
         default: ''
-      environment:
-        type: map
-        required: false
-        default: {}
     requirements:
       - compute:
           node: tosca.nodes.Root
           relationship: tosca.relationships.DependsOn
+          occurrences: [0, 1]
+      - environment:
+          node: tosca.nodes.Root
+          relationship: tosca.asyncssh.software_configuration.inject_environment
           occurrences: [0, 1]
     interfaces:
       Standard:

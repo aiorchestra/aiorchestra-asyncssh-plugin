@@ -133,7 +133,7 @@ async def create(node, inputs):
         'password': node.properties.get('password'),
         'private_key': node.runtime_properties[
             'ssh_keypair']['private_key_content'],
-        'env': node.properties.get('environment', {})
+        'env': node.runtime_properties.get('environment', {})
     })
 
 
@@ -199,3 +199,22 @@ async def delete(node, inputs):
                              .format(node.name))
     if 'ssh' in node.runtime_properties:
         del node.runtime_properties['ssh']
+
+
+@utils.operation
+async def inject(source, target, inputs):
+    source.context.logger.info('[{0} -----> {1}] Setting up '
+                               'environment using '
+                               'target node properties.'
+                               .format(target.name, source.name))
+    env = source.runtime_properties.get('environment', {})
+    env.update(target.properties)
+    source.update_runtime_properties('environment', env)
+
+
+@utils.operation
+async def eject(source, target, inputs):
+    source.context.logger.info('[{0} --X--> {1}] Destroying environment.'
+                               .format(target.name, source.name))
+    if 'environment' in source.runtime_properties:
+        del source.runtime_properties['environment']

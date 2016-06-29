@@ -40,6 +40,22 @@ node_types:
         unlink:
           implementation: asyncssh_plugin.tests.plugin:eject_host_and_key
 
+  software_configuration_environment:
+    derived_from: tosca.nodes.Root
+    properties:
+      my_own_var:
+        type: string
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: aiorchestra.core.noop:noop
+        start:
+          implementation: aiorchestra.core.noop:noop
+        stop:
+          implementation: aiorchestra.core.noop:noop
+        delete:
+          implementation: aiorchestra.core.noop:noop
 
 topology_template:
 #####################################################################
@@ -69,6 +85,11 @@ topology_template:
     relationship_stab:
       type: tosca.aiorchestra.node
 
+    orchestra_software_configuration_environment:
+      type: software_configuration_environment
+      properties:
+        my_own_var: 'Hello'
+
     orchestra_software_configuration_script:
       type: tosca.asyncssh.software_configuration.script
       properties:
@@ -76,9 +97,8 @@ topology_template:
         port: { get_input: ssh_port }
         install_script: { get_input: install_script }
         uninstall_script: { get_input: uninstall_script }
-        environment:
-          my_own_var: 'Adele: Hello from the other side!'
       requirements:
+        - environment: orchestra_software_configuration_environment
         - host_and_key:
             node: relationship_stab
             relationship: test.asyncssh.plugin.inject_host_key
