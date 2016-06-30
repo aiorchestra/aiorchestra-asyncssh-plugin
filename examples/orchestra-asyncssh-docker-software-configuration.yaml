@@ -9,8 +9,8 @@ description: Software configuration
 
 imports:
 
-  - ../types.yaml
-  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/master/types.yaml
+  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-asyncssh-plugin/0.1.2-stable/types.yaml
+  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/0.1.2-stable/types.yaml
 
 #####################################################################
 # Node types
