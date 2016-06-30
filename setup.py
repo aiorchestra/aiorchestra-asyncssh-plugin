@@ -21,7 +21,7 @@ def read(fname):
 
 setuptools.setup(
     name='aiorchestra-asyncssh-plugin',
-    version='0.1.1',
+    version='0.1.2',
     description='AsyncIO TOSCA orchestrator AsyncSSH plugin for Software configuration',
     long_description=read('README.rst'),
     url='https://aiorchestra.io/',
@@ -29,7 +29,7 @@ setuptools.setup(
     author_email='lildee1991@gmail.com',
     packages=setuptools.find_packages(exclude=['asyncssh.tests', ]),
     install_requires=[
-        'aiorchestra==0.1.1',
+        'aiorchestra==0.1.2',
         'asyncssh',
     ],
     license='License :: OSI Approved :: Apache Software License',
